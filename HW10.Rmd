@@ -1,0 +1,279 @@
+---
+title: "HW10"
+author: "PrachiJhamb"
+date: "4/18/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,eval = TRUE, message = FALSE,warning = FALSE)
+necessaryPackages <- c("foreign","reshape2" ,"tidyverse" ,"dplyr" ,"stringr" ,"ggplot2" ,"stargazer" ,"readr" ,"haven","broom","huxtable","wbstats","rnaturalearth","viridis","Hmisc","fastmatrix","GGally","mctest","caret","cowplot","gbm","skimr","RANN","randomForest","fastAdaboost","xgboost","caretEnsemble","C50", "earth","mlbench","BDgraph","sjPlot","MatchIt","glmnet")  
+new.packages <- necessaryPackages[!(necessaryPackages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(necessaryPackages, require, character.only = TRUE)
+setwd("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass")
+```
+**This assignment will take you through a Propensity Score Matching exercise, with a Machine Learning twist at the end. The example data contains test results of school children along with various characteristics.**
+
+ **Key Question--Do catholic schools have an effect on student’s performance?**
+The key issus is, of course, that students in catholic schools (“Treated”) might be different from those in
+non-catholic schools (“Control”). The exercise will show how propensity score matching attempts to reduce
+this issue (Note: it does not solve it completely).
+
+**Part A: Understanding and running PSM**
+
+1. Download the data [from here](http://www.mfilipski.com/files/ecls.csv) 
+```{r}
+df1 <- read.csv("ecls.csv",header=TRUE)
+df1copy <- df1 #keep a copy for the original dataset
+```
+For the purpose of questions 1 - 6, make a smaller dataset which only contains the variables:
+c5r2mtsc_std ;catholic; w3income_1k; p5numpla; w3momed_hsb
+```{r}
+library(dplyr)
+df1 <- df1 %>%  dplyr::select(c5r2mtsc_std,catholic,w3income_1k,p5numpla,w3momed_hsb) %>% 
+  rename(scores = c5r2mtsc_std, income = w3income_1k, places = p5numpla, momEduc =  w3momed_hsb)
+```
+**2. Identify the problem**
+```{r}
+df1 %>%
+  group_by(catholic) %>%
+  summarise(mathscore = mean(scores),n = n())
+
+t.test(scores ~ catholic, df1) # two-sample T-test
+
+```
+**• Do test scores on c5r2mtsc_std differ for pupils of catholic and non-catholic schools on average?**
+-- Yes. (0.163 for non-catholic schools v/s 0.219 for catholic schools)
+
+**• Can you conclude that going to a catholic school leads to higher math scores? Why or why not?**
+No, The difference of means across groups is not significant since p value is greator than 0.05. 
+
+#Run regressions
+```{r}
+#1)A regression of just math scores on the catholic dummy
+reg1 <- lm(scores ~ catholic, df1)
+library(stargazer)
+stargazer(reg1,type="text",title="Math Scores on catholic dummy")
+
+```
+The coefficient suggests that attending a catholic school has no significant effect on math scores.
+```{r}
+#2)regression that includes all the variables listed above
+reg2 <- lm(scores ~ catholic + income + places + momEduc, data = df1)
+library(stargazer)
+stargazer(reg2,type="text",title="Math Scores on All Variables")
+```
+The coefficient suggests that attending a catholic school is associated with a 12 percent decrease in math scores.An increase in income by 1 thousand is associated with an increase in math scores by 0.5 percent.A change in the number of places a student visited is associated with a 10 percent decrease in math scores and a student with a high school educated mother will have a 37 percent lower test score as compared to a student with a college eductaed mother.The coefficients on all regressors are statistically significant but the R squared value suggests that only 12 percent of the variation in the test scores is explained by our model. 
+
+**Do the means of the covariates (income, mother’s education etc) differ between catholic vs non-catholic schools?**
+
+```{r}
+df1 %>%
+  group_by(catholic) %>%
+  summarise(mathscore = mean(scores),income = mean(income), places = mean(places), momEduc = mean(momEduc)) #compare the means
+```
+
+```{r}
+#test for difference in means for statistical significance
+t.test(income ~ catholic, data = df1)$p.value
+```
+
+```{r}
+t.test(places ~ catholic, data = df1)$p.value
+```
+
+```{r}
+t.test(momEduc ~ catholic, data = df1)$p.value
+```
+
+We see that the means of all groups(or,all regressors) are significantly different across school types.
+
+##Discuss what would be the problems with an identification strategy based on simple regressions.##
+
+There is a concern of endogeneity if we simply compare the average outcomes between those in a catholic school versus those in a non-catholic school. This is because students who go to catholic schools could be inherently different than students who go to non-catholic school and these underlying differences between those two groups could bias are causal estimates.
+
+**3. Estimate the propensity to go to catholic school, by hand**
+
+##• Run a logit regression to predict catholic based on the covariates we kept (but not the math scores, ofcourse).
+
+[Hint: you can use the glm command and the option family = binomial() ]
+
+```{r}
+#Logit regression
+logit=glm(catholic~income+places+momEduc, family = binomial(), data = df1)
+summary(logit)
+```
+##• Make a prediction for who is likely to go to catholic school, using this model
+– [Hint: use the predict command]
+```{r}
+#Prediction
+df1$pr_score <- predict(logit,newdata=df1,type = "response") 
+df2<-df1[c(6,2)]
+head(df2)
+```
+##• Check that there is common support.
+– (Meaning check both groups have predicted values in overlapping ranges)
+– You may check this visually. For instance: you can do this with two histograms side-by-side. Or
+plot densities.
+– Plot the income variable against the logit prediction (by catholic), and add the lowess smooth
+densities to the plot. They should look similar, but not perfectly aligned.
+
+**Visually check Income versus Predicted Value**
+```{r}
+library(ggplot2)
+df1 %>% ggplot(aes(pr_score,income, color=factor(catholic))) +
+        geom_point() +
+        geom_smooth() +
+  xlab("Logit prediction")
+```
+
+**Plot densities for both groups**
+```{r}
+library(ggplot2)
+ggplot(df1, aes(x = pr_score, group = factor(catholic), color = factor(catholic))) + 
+  geom_density()
+```
+
+**4.Run a Matching algorithm to get the impact of catholic schools by PSM**
+```{r}
+#Create a matched dataset
+library(MatchIt)
+psm=matchit(catholic~income+places+momEduc, family = binomial(), data = df1)
+data_psm <- match.data(psm)
+dim(data_psm) # check dimensions 
+data_psm %>%
+  group_by(catholic) %>%
+  summarise(n = n()) #check number of observations in each group
+
+```
+Now we have 1860 observations. In the original dataset, we had 930 observations where catholic equals 1 while the remaining 4499 observations were all 0, which was not balanced. Now we have just 930 each in the new dataset.
+
+**Sort the data by distance, and show the 10 first observations.**
+```{r}
+data_psm<-data_psm[order(data_psm$distance),]
+head(data_psm,n=10)
+```
+In this new dataset, do the means of the covariates (income, etc) differ between catholic vs. non-catholic schools?
+```{r}
+library(dplyr)
+data_psm %>% 
+  group_by(catholic) %>% 
+  dplyr::summarise(score = mean(scores),
+                   income = mean(income),
+                   places = mean(places),
+                   momEduc = mean(momEduc),
+                   pr_score = mean(pr_score),
+                   distance = mean(distance),
+                   weights = mean(weights))
+```
+
+```{r}
+#Test in difference in means for statistical significance
+t.test(income ~ catholic, data = data_psm)$p.value
+t.test(places ~ catholic, data = data_psm)$p.value
+t.test(momEduc ~ catholic, data = data_psm)$p.value
+```
+**Reflect on what PSM did for your identification strategy.**
+
+All the P-values are now 1 meaning the differences are not statistically different. And now the parallel trends assumption will hold in the new matched dataset since covariates don’t differ.
+
+**5. Visually check the balance in the new dataset:**
+```{r}
+# income against prediction after matching 
+ggplot(data_psm, aes(pr_score, income, color = factor(catholic))) + 
+  geom_point() +
+  geom_smooth(method = "loess") + xlab("Propensity score")
+```
+
+```{r}
+#places against prediction after matching
+ggplot(data_psm, aes(pr_score, places, color = factor(catholic))) + 
+  geom_point() +
+  geom_smooth(method = "loess") + xlab("Propensity score")
+```
+
+**6. Compute the average treatment effect in your new sample**
+
+Means comparison.
+```{r}
+data_psm %>% group_by(catholic) %>% summarise_all(mean) 
+```
+Run regressions:
+• Comment on the results of those regressions after the PSM procedure
+```{r}
+reg3 <- lm(scores ~ catholic, data = data_psm) #regress scores on the catholic dummy
+library(stargazer)
+stargazer(reg3,type="text",title="Math Scores on Catholic Dummy")
+```
+
+```{r}
+reg4 <- lm(scores ~ catholic + income + places+ momEduc, data = data_psm) #regress scores on all variables
+stargazer(reg4,type="text",title="Math Scores on All Variables")
+```
+In reg 3, we see that being in Catholic schools deceases the math score, and the effect is statistically significant. After adding other control variables, the effect is still negative and statistically significant. Only higher family income is associated with increase in test scores. Staying in more places over the past months also decreases test scores but it is not significant.
+*****************Part B: Deconstructing PSM************************
+**7. Split the PSM procedure**
+• Reproduce a PSM ‘by hand’:
+```{r}
+#Verify they are the same
+logitpred<-fitted(logit)
+plot(psm$distance,logitpred)
+```
+**Run your same matchit command but with distance= your logit predictions. See that this is the
+same.**
+```{r}
+#Run matchit again but with distance=fitted logit model
+psm1=matchit(catholic~income+places+momEduc, family = binomial(), data = df1, distance = logitpred)
+data_psm1<-match.data(psm1)
+```
+# We see that data_psm and data_psm1 are exactly the same.
+
+**8. Use Machine Learning for matching**
+Run the lasso on all the numeric covariates
+– Hint: You can use cv.glmnet followed by glmnet with the best lambda (use lambda.1se, not
+lambda.min) [lambda.1se the “most regularized model such that error is within one standard error of the minimum”]
+– Hint: The glmnet command likes to work with matrix objects, so make sure you make x into a
+matrix.
+```{r}
+ML_df <- df1copy %>%  dplyr::select(where(is.numeric)) 
+head(ML_df)
+#Change into matrix
+y = data.matrix(ML_df$catholic)
+x = data.matrix(ML_df[2:18])
+library(glmnet)
+#Run the LASSO on all numeric covariates
+cvlasso = cv.glmnet(x,y,family="binomial",alpha=1, type.measure="deviance")
+lasso = glmnet(x,y,family="binomial",alpha=1, type.measure="deviance", lambda = cvlasso$lambda.1se)
+plot(cvlasso, cex=0.8, cex.axis=0.8)
+```
+#List the variables selected by your LASSO model [hint: use coef() command]
+```{r}
+# coef function returns lambda.1se coefficients by default
+coef(lasso) 
+```
+**9. Use Lasso predictions for matching.**
+
+• Generate a prediction from the “best lasso” model
+• Use that prediction as your distance in the matchit command
+• Create the match.data dataset based on that matchit.
+• Make a couple of plots to see if your Lasso matching is different from your original matching.
+• Reflect on how PSM methods can be coupled with ML methods.
+
+```{r}
+# matching with predictions from the lasso model as the distance
+ml_Match <-  match.data(matchit(catholic~ w3income_1k + p5numpla + w3momed_hsb,
+                                    data = ML_df,
+                                    distance=as.numeric(predict(lasso,newx = as.matrix(ML_df[,2:18]),type= "response"))))
+```
+
+```{r}
+# income v/s prediction
+ggplot(ml_Match, aes(distance, w3income_1k), color = factor(catholic)) + geom_smooth(method = "loess")
+```
+
+```{r}
+# momDegree v prediction
+ggplot(ml_Match, aes(distance, w3momed_hsb), color = factor(catholic)) + geom_smooth(method = "loess")
+```
+

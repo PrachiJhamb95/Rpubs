@@ -1,0 +1,92 @@
+---
+title: "HW11"
+author: "PrachiJhamb"
+date: "5/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+necessaryPackages <- c("foreign","reshape2" ,"dplyr" ,"stringr" ,"ggplot2" ,"stargazer" ,"readr" ,"haven","broom","huxtable","wbstats","viridis","Hmisc","fastmatrix","GGally","cowplot","tidyverse", "caret", "skimr", "rpart", "randomForest", "rattle", "neuralnet", "nnet")  
+new.packages <- necessaryPackages[!(necessaryPackages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(necessaryPackages, require, character.only = TRUE)
+setwd("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/")
+```
+
+# Import training and testing data:
+```{r}
+train_raw <- read.csv2("home-data-for-ml-course/train.csv", sep = ",",stringsAsFactors = TRUE)
+test_raw <-  read.csv2("home-data-for-ml-course/test.csv", sep = ",",stringsAsFactors = TRUE)
+dim(train_raw)
+#dim(test_raw)
+# This is useful to look at data, from skimr package. Doesn't render in latex though.
+# skim(train_raw)
+```
+Notice that the train dataset has one more column than the test dataset (SalePrice, which you want to predict)
+Here’s some code to do very minimal cleaning:
+
+```{r}
+# Functions to replace NAs with most frequent level or median
+replace_na_most <- function(x){
+fct_explicit_na(x, na_level = names(which.max(table(x))))
+}
+replace_na_med <- function(x){
+    x[is.na(x)] <- median(x,na.rm = TRUE)
+x }
+cleanup_minimal <- function(data){ nomis <- data %>%
+        mutate_if(is.factor, replace_na_most) %>%
+        mutate_if(is.numeric, replace_na_med)
+    nomis
+}
+train_minclean <- cleanup_minimal(train_raw)
+test_minclean <- cleanup_minimal(test_raw)
+```
+Run the simplest tree algorithm there is
+Here’s some code to run an rpart regression tree, and to plot it
+
+```{r}
+ mod_rpart <- rpart(SalePrice~., data=train_minclean) 
+# Try this command to make a nice tree plot!
+fancyRpartPlot(mod_rpart, caption = NULL)
+```
+Here’s some code to export the predictions in the appropriate format
+```{r}
+pred_rpart <- predict(mod_rpart, newdata = test_minclean) 
+submission_rpart <- tibble(Id=test_raw$Id, SalePrice=pred_rpart) 
+head(submission_rpart)
+```
+
+```{r}
+write_csv(submission_rpart, file="/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/submission_rpart.csv")
+```
+
+
+```{r}
+knitr::include_graphics("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/images/image1.png")
+```
+
+# Task 2
+```{r}
+# Training a random forest
+mod_rf <- randomForest(SalePrice ~ ., data = train_minclean)
+
+trainX <- select(train_minclean, -SalePrice)
+test_minclean <- rbind(trainX[1, ] , test_minclean)
+test_minclean <- test_minclean[-1,]
+# Get predictions:
+pred_rf <-predict(mod_rf, newdata = test_minclean)
+submission_rf <- tibble(Id=test_raw$Id, SalePrice=pred_rf)
+write_csv(submission_rf, file="submission_rf.csv")
+```
+
+```{r}
+knitr::include_graphics("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/images/image2.png")
+```
+
+
+
