@@ -1,0 +1,160 @@
+---
+title: "HW6"
+author: "PrachiJhamb"
+date: "2/22/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,eval = TRUE, message = FALSE,warning = FALSE,fig.height = 5)
+necessaryPackages <- c("foreign","reshape" ,"tidyverse" ,"dplyr" ,"stringr" ,"ggplot2" ,"stargazer" ,"readr" ,"haven","broom","huxtable","rdd")
+new.packages <- necessaryPackages[!(necessaryPackages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(necessaryPackages, require, character.only = TRUE)
+setwd("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass")
+df1 <- read.dta("AEJfigs.dta")
+```
+
+a. In this exercise, you will explore regression dicontinuity designs, based the following paper:
+**Carpenter and Dobkin(2009) The Effect of Alcohol Consumption on Mortality: Regression Discontinuity Evidence from the Minimum Drinking Age** AEJ: Applied Economics 1(1)164-82
+
+**b. Get the Carpenter & Dobkin and data:**
+
+Can be downloaded straight [here](http://masteringmetrics.com/wp-content/uploads/2015/01/AEJfigs.dta) , from A&P Mastering Metrics resources webpage. (If that link is dead just ask me for the file.)
+Look over the data, understand what the different variables are. The key variables you need are agecell, all, internal, external, as well as the versions of those variables that have the suffix fitted.
+Make an over21 dummy to help with the following analysis. 
+
+```{r}
+df1$over21 <- ifelse(df1$agecell >= 21, 1, 0) #dummy for over21
+df1 %>% select(c(1:7,20)) %>% head()
+```
+
+**c. Reproduce Figure 3 of the paper**
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+
+df_reshape <- df1 %>%
+  select(agecell,all,allfitted,internal,internalfitted,external,externalfitted) %>%
+  gather(key = "variable" , value = "value",-agecell)
+
+fig3 <- ggplot(df_reshape, aes(x = agecell, y = value)) + 
+  geom_point(aes(color = variable)) + 
+  scale_x_continuous(breaks=seq(19, 23, 0.5),limits=c(19,23),expand=c(0,0)) +
+  scale_color_manual(values=c("#CCCCCC","#666666","#999999", "#000000", "#99CCFF", "#0000FF"), 
+                       name="variable",
+                       labels=c("All", "All fitted", "Internal", "Internal fitted", "External", "External fitted"))+ geom_vline(xintercept = 21, color = "red", linetype = "dashed", size=1) +
+  labs(title= "FIGURE 3. AGE PROFILE FOR DEATH RATES", x = "Age",
+        y = "Deaths per 100,000 person-years") + theme(panel.background = element_blank()) + 
+  theme(plot.title = element_text(hjust = 1)) +scale_y_continuous(breaks=seq(0,120,20),limits=c(0,120),expand=c(0,0)) +
+  theme(axis.line.x = element_line(color="black", size = 0.5),
+        axis.line.y = element_line(color="black", size = 0.5), axis.text.y = element_text(colour = "black"),  panel.grid.minor =   element_blank(),
+        panel.grid.major =   element_line(colour = "white",size=0.75)) + theme(panel.border= element_blank()) + 
+  theme(legend.background = element_rect(size=0.5, linetype="solid", colour ="black"), legend.direction = "vertical", legend.title = element_blank()) +  guides(col =guide_legend(nrow =3))
+
+fig3
+```
+
+
+**d. Simplest regression-discontinuity design**
+
+Run a simple RD regression (same slope, with a jump) for “all” deaths by age 
+
+Analyse the results. How do you use these results to estimate the relationship between drinking and mortality?
+
+
+```{r}
+library(broom)
+reg1 = lm(all ~ agecell+over21, data = df1)
+df1$fit1 <- predict(reg1,df1)
+table1 <- huxreg(reg1, 
+                   statistics = c("N. obs." = "nobs","R squared" = "r.squared")) %>%
+set_caption("Table 1:Simple Regression discontinuity design")
+table1
+```
+**The results show that alcohol consumption increases mortality at age 21 by about 8 deaths per 100,000 people. **
+The coefficient on "Over21" is the difference in mortality between those above 21 and those below 21. In the above result this coefficient is equal to 7.66. This shows an increase in mortality at the cutoff. 
+
+**e. Plot the results **
+
+Plot the all variable by age, and add the regression lines defined by your regression output.
+
+```{r}
+plotreg1 <- plot(df1$agecell,df1$all, pch=17, frame.plot = FALSE,
+     xaxs="i",yaxs="i",
+     xlim=c(19,23), ylim=c(85,110),
+     main = "A Simple RD regression Plot",
+     xlab = "Age", ylab ="Deaths per 100,000 person-years", cex.main=1, font.main=1)
+with(subset(df1, over21==0),lines(agecell, fit1, col="red", lty=3, lwd=3))
+with(subset(df1, over21==1),lines(agecell, fit1, col="chocolate1", lty=3, lwd=3))
+```
+
+
+**f. Allow more flexibility to your RD**
+
+Run another RD where not only the intercept, but also the slope can differ between the under- and over-21 subsamples.
+Analyse the results. What is your estimate of interest. Does it differ from the previous one?
+
+
+```{r}
+reg2 = lm(all ~ agecell+over21+I(agecell*over21), data = df1)
+df1$fit2 <- predict(reg2,df1)
+table2 <- huxreg(reg2, 
+                   statistics = c("N. obs." = "nobs","R squared" = "r.squared")) %>%
+set_caption("Table 2:Flexible RDD")
+table2
+```
+
+Our variable of interest was "Over21". However, it is now combined with the interaction term with agecell. Hence, the marginal effect of being over21 is : 83.33 +(-3.60*21) = 7.66 which is same as before.
+
+**g. Again, plot the data**
+
+Again, plot the data and the regression lines defined by the regression.
+
+```{r}
+plotreg2 <- plot(df1$agecell,df1$all, 
+     pch=10, frame.plot = FALSE,
+     xaxs="i",yaxs="i",
+     xlim=c(19,23), ylim=c(85,110),
+     main = "Flexible Regression Discontinuity Plot",
+     xlab = "Age", ylab ="Deaths per 100,000 person-years", 
+     cex.main=1, font.main=1)
+with(subset(df1, over21==0),lines(agecell, fit2, col="red", lty=1, lwd=3))
+with(subset(df1, over21==1),lines(agecell, fit2, col="chocolate1", lty=1, lwd=3))
+plotreg2
+```
+
+**f. Compare to pre-packaged RDD:**
+
+Use the rdd package.
+Run the RDestimate command on all~agecell, specifying your data and the cutoff option at 21.
+Print the output of your regression.
+Plot the output of your regression (You can just write plot(name). RDestimate outputs plotable objects).
+Discuss the results. Do they differ from what you found? Why?
+
+```{r}
+library(rdd)
+reg3 <- RDestimate(all~agecell, data = df1, cutpoint = 21)
+summary(reg3)
+```
+
+```{r}
+plot(reg3)
+```
+The results show that "LATE" is computed with a default bandwidth of "1.6561".The estimate in this result is larger that the "simple Regression Discontuity" design. We see that the mortality increases by 9.001 at the cutoff.
+
+**g. Prepackaged linear RDD:**
+
+Re-run an RDestimate command, this time adding the options kernel = "rectangular" and bw=2. Output the results. Plot them. Compare to previous output and discuss.
+
+```{r}
+library(rdd)
+rdd_rect_kernel <- RDestimate(all~agecell, data = df1, cutpoint = 21,
+                           kernel = "rectangular", bw=2)
+summary(rdd_rect_kernel)
+plot(rdd_rect_kernel)
+```
+
+We see that after increasing the badwidth the estimates are closer to “simple Regression Discontuity” design.
