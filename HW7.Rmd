@@ -1,0 +1,117 @@
+---
+title: "HW7"
+author: "PrachiJhamb"
+date: "3/9/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,eval = TRUE, message = FALSE,warning = FALSE,fig.height = 5)
+necessaryPackages <- c("foreign","reshape" ,"tidyverse" ,"dplyr" ,"rvest","stringr" ,"ggplot2" ,"stargazer" ,"readr" ,"haven","broom","huxtable","maps")
+new.packages <- necessaryPackages[!(necessaryPackages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(necessaryPackages, require, character.only = TRUE)
+```
+
+```{r}
+setwd("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass")
+df1 <- read.csv("1976-2020-president.csv",1)
+str(df1)
+summary(df1$candidatevotes)
+```
+
+
+**2. Load the data, and clean it up**
+You should aim to make a dataset at the state*year level, with infomation on the party who won in that state and that year.
+
+• Tip 1: you can define the color in that dataset already. Make sure it is defined as.character
+• Tip 2: the hardest thing here is to select the winning observations. There are hundreds of ways to do it in R, most of them un-intuitive. My favorite involves group_by then top_n, both from the dplyr
+package.
+```{r}
+library(dplyr)
+df1 <- dplyr::rename(df1, party = party_simplified)
+winners <- df1 %>% 
+  group_by(state,year) %>% 
+  top_n(1,candidatevotes)
+df2 <- dplyr::select(winners, year, state, state_fips, party, candidate)
+df2 <- mutate(df2, color = recode(as.character(party), "DEMOCRAT" = "blue", "REPUBLICAN" = "red", "OTHER" = "white"))
+head(df2)
+```
+
+**3. Try to make a map just for one year:**
+If your data is in the right format, this takes very few commands:
+- one command to subset data for just one year
+- one command to select the observsations that match state.fips$fips 
+- one command to map
+
+```{r}
+library(maps)
+df3_2020 <- dplyr::filter(df2, year ==2020)
+df3_2020 <- df3_2020[match(state.fips$fips,df3_2020$state_fips),]
+maps::map('state', col = df3_2020$color, fill = TRUE)
+legend("bottomright", legend = c("Democrat", "Republican"), fill = c("blue", "red"), cex = 0.7)
+title("2020 Presidential Elections Results", line = 1)
+```
+
+**4. Now loop that code and map it over time:**
+• If you are using base plots, you will need to define a layout grid
+• If you are using ggplot, you can probably do it with facets, but I havent tried.
+
+```{r}
+par(mfrow = c(4,3),mar=c(0,0,0,0))
+library(dplyr)
+# loop over all years
+for (i in seq(min(df2$year),max(df2$year),4)) {
+  time <- paste("win", i) # create a temporary dataframe for each year
+  time <- dplyr::filter(df2, year == i) # select year as defined by 'i' counter 
+  time <- time[match(state.fips$fips, time$state_fips),] # match fips
+maps::map('state', col = time$color, fill = T) # and plot
+title(i, line =1)
+}
+legend("right", legend = c("Democrat", "Republican","Other"), fill = c("blue", "red","white"), cex = 0.7)
+```
+**Part 2: Interactive Maps with Leaflet**
+1. Get familiar with the leaflet package
+```{r}
+library(leaflet)
+myMap<-leaflet() %>%
+  addProviderTiles(providers$OpenStreetMap) %>%
+  setView(lat = 33.947474,lng = -83.373671,zoom = 12)
+myMap
+```
+
+**2. Add your own shapefiles**
+Go to [data.humdata.org](https://data.humdata.org/dataset/outline-of-camps-sites-of-rohingya-refugees-in-cox-s-bazar-bangladesh) and download the shapefile for Rohingya refugee camps. There are several files, but I suggest using the zipfile ending with “_AL2.zip” (not .kmz file)
+Unzip the file and load the .shp into R like this:
+```{r}
+library(raster)
+sp<-shapefile("220130_RRC_Outline_Block_AL2/T220130_RRC_Outline_Block_AL2.shp")
+# Projection is necessary for R to place the coordinates correctly
+campShapeFile<-spTransform(sp,CRS("+proj=longlat +datum=WGS84 +no_defs"))
+head(campShapeFile)
+```
+• Zoom your map onto South-Eastern Bangladesh (setView(92.14871, 21.18780, zoom = 12)) 
+• Add the shapefile to your map with:addpolygons;add some highlights inside addPolygons function ; add labels with another option.
+
+```{r}
+library(leaflet)
+myMap2<-leaflet() %>%
+  addProviderTiles(providers$Esri.NatGeoWorldMap) %>%
+  setView(lat = 21.18780,lng = 92.14871,zoom = 12) %>%
+  addPolygons(data = campShapeFile,fill = TRUE,stroke = T,weight = 1,highlight=highlightOptions(fillOpacity = 0.7),label = campShapeFile$Block_No)
+myMap2
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
