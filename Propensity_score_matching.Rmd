@@ -10,7 +10,7 @@ necessaryPackages <- c("foreign","reshape2" ,"tidyverse" ,"dplyr" ,"stringr" ,"g
 new.packages <- necessaryPackages[!(necessaryPackages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 lapply(necessaryPackages, require, character.only = TRUE)
-setwd("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass")
+setwd("~/Rclass")
 ```
 **This assignment will take you through a Propensity Score Matching exercise, with a Machine Learning twist at the end. The example data contains test results of school children along with various characteristics.**
 
