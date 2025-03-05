@@ -14,7 +14,7 @@ necessaryPackages <- c("foreign","reshape2" ,"dplyr" ,"stringr" ,"ggplot2" ,"sta
 new.packages <- necessaryPackages[!(necessaryPackages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 lapply(necessaryPackages, require, character.only = TRUE)
-setwd("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/")
+setwd("Rclass/")
 ```
 
 # Import training and testing data:
@@ -61,12 +61,12 @@ head(submission_rpart)
 ```
 
 ```{r}
-write_csv(submission_rpart, file="/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/submission_rpart.csv")
+write_csv(submission_rpart, file="Rclass/submission_rpart.csv")
 ```
 
 
 ```{r}
-knitr::include_graphics("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/images/image1.png")
+knitr::include_graphics("/Rclass/images/image1.png")
 ```
 
 # Task 2
