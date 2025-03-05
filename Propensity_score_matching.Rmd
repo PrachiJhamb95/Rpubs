@@ -1,5 +1,4 @@
 ---
-title: "HW10"
 author: "PrachiJhamb"
 date: "4/18/2022"
 output: html_document
