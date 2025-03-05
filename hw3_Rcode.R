@@ -1,19 +1,8 @@
-##############################################################
-#       Twinkle Roy
-#
-##############################################################
-##############################################################
-#      Homework 3
-#
-##############################################################
+
 
 options(RStata.StataPath='ssh -q stata.sesync.org /usr/local/stata15/stata')
 options(RStata.StataVersion=15)
 
-##############################################################
-#       following from midterm
-#
-##############################################################
 library(RStata)
 library(foreign)
 library(Hmisc)
@@ -28,7 +17,7 @@ library(texreg)
 library(naniar)
 library(expss)
 
-dataset <- read.dta("C:/Users/Twinkle/OneDrive - University of Georgia/Desktop/Exam1/exp_data.dta")
+dataset <- read.dta("data.dta")
 #### Assign Labels to Dataset ####
 
 dataset = 
