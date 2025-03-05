@@ -13,7 +13,7 @@ lapply(necessaryPackages, require, character.only = TRUE)
 ```
 
 ```{r}
-setwd("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass")
+setwd("~/Rclass")
 df1 <- read.csv("1976-2020-president.csv",1)
 str(df1)
 summary(df1$candidatevotes)
