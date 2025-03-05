@@ -1,4 +1,4 @@
-
+#Task: Creating Stone Price Index
 
 options(RStata.StataPath='ssh -q stata.sesync.org /usr/local/stata15/stata')
 options(RStata.StataVersion=15)
