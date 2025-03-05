@@ -159,5 +159,5 @@ dataset1$stp_index = exp(dataset1$xfath_budgetshare*dataset1$pfath_log_price +
 
 dataset1$lrxtotal = log(dataset1$total_exp) - log(dataset1$stp_index)
 
-write.dta(dataset1, "C:/Users/Twinkle/OneDrive - University of Georgia/Desktop/Exam1/finaldataset.dta")
+write.dta(dataset1, "dataset.dta")
 
