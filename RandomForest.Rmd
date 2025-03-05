@@ -84,7 +84,7 @@ write_csv(submission_rf, file="submission_rf.csv")
 ```
 
 ```{r}
-knitr::include_graphics("/Users/prachijhamb/Library/CloudStorage/OneDrive-UniversityofGeorgia/Rclass/images/image2.png")
+knitr::include_graphics("Rclass/images/image2.png")
 ```
 
 
